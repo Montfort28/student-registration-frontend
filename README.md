@@ -27,6 +27,7 @@ Login Info (for testing)
 Admin Login Credentials:
 - Email: admin@example.com
 - Password: admin123
+
 Students can register themselves via the registration form.
 
 Routing
