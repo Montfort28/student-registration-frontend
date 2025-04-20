@@ -1,5 +1,6 @@
 Frontend README - Student Registration System
-Overview
+
+Overview:
 This frontend application is built with React.js and Material-UI, providing a responsive interface for student registration, login, profile viewing, and an admin dashboard. It integrates seamlessly with the backend API.
 
 Features
@@ -34,7 +35,7 @@ Routing
 - /register : Registration page
 - /profile : Protected profile page
 - /admin/dashboard : Admin-only dashboard
-- * : 404 Not Found page
+- 404 Not Found page
 
 Technologies Used
 - React.js
