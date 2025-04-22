@@ -31,7 +31,7 @@ Admin Login Credentials:
 Students can register themselves via the registration form.
 
 Routing
-- / : Home page
+- /Home : Home page
 - /login : Login page
 - /register : Registration page
 - /profile : Protected profile page
