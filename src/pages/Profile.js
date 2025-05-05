@@ -17,6 +17,8 @@ import CakeIcon from '@mui/icons-material/Cake';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import EventIcon from '@mui/icons-material/Event';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import QRCode from 'react-qr-code';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -49,6 +51,16 @@ const Profile = () => {
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
+
+  // Prepare user data for QR code
+  const qrCodeData = JSON.stringify({
+    id: currentUser.id,
+    registrationNumber: currentUser.registrationNumber,
+    name: `${currentUser.firstName} ${currentUser.lastName}`,
+    email: currentUser.email,
+    role: currentUser.role,
+    dateOfBirth: currentUser.dateOfBirth
+  });
 
   const isAdmin = currentUser.role === 'admin';
 
@@ -178,7 +190,7 @@ const Profile = () => {
                       {t.personalInfo.dateOfBirth}
                     </Typography>
                   </Box>
-                  <Typography variant="body1" sx={{ ml: 4 }}>
+                  <Typography variant="body1"  sx={{ ml: 4 }}>
                     {formatDate(currentUser.dateOfBirth)}
                   </Typography>
                 </Grid>
@@ -191,7 +203,8 @@ const Profile = () => {
             sx={{ 
               borderRadius: 2,
               boxShadow: '0 4px 8px rgba(0,0,0,0.05)',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              mb: 4
             }}
           >
             <Box sx={{ bgcolor: 'primary.main', py: 1.5, px: 3 }}>
@@ -249,6 +262,43 @@ const Profile = () => {
                   </Typography>
                 </Grid>
               </Grid>
+            </CardContent>
+          </Card>
+          
+          {/* QR Code Card */}
+          <Card 
+            variant="outlined" 
+            sx={{ 
+              borderRadius: 2,
+              boxShadow: '0 4px 8px rgba(0,0,0,0.05)',
+              overflow: 'hidden'
+            }}
+          >
+            <Box sx={{ bgcolor: 'primary.main', py: 1.5, px: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <QrCodeIcon sx={{ color: 'white', mr: 1 }} />
+                <Typography variant="h6" color="white" fontWeight="bold">
+                  {t.qrCode?.title || "QR Code"}
+                </Typography>
+              </Box>
+            </Box>
+            <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Box sx={{ 
+                p: 3, 
+                bgcolor: 'white', 
+                borderRadius: 2, 
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)', 
+                mb: 2 
+              }}>
+                <QRCode 
+                  value={qrCodeData} 
+                  size={200}
+                  level="H"
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary" align="center">
+                {t.qrCode?.scanInstruction || "Scan this QR code to view user information"}
+              </Typography>
             </CardContent>
           </Card>
         </Paper>
