@@ -32,6 +32,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonIcon from '@mui/icons-material/Person';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import QRCode from 'react-qr-code';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { adminService } from '../services/api';
@@ -49,6 +52,7 @@ const AdminDashboard = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openQrDialog, setOpenQrDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -93,6 +97,11 @@ const AdminDashboard = () => {
     setOpenDeleteDialog(true);
   };
 
+  const handleQrCodeClick = (user) => {
+    setSelectedUser(user);
+    setOpenQrDialog(true);
+  };
+
   const handleCloseEditDialog = () => {
     setOpenEditDialog(false);
 
@@ -104,6 +113,14 @@ const AdminDashboard = () => {
 
   const handleCloseDeleteDialog = () => {
     setOpenDeleteDialog(false);
+    // Reset selected user after dialog closes
+    setTimeout(() => {
+      setSelectedUser(null);
+    }, 100);
+  };
+
+  const handleCloseQrDialog = () => {
+    setOpenQrDialog(false);
     // Reset selected user after dialog closes
     setTimeout(() => {
       setSelectedUser(null);
@@ -222,6 +239,72 @@ const AdminDashboard = () => {
   // Get initials for avatar
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
+
+  // Create QR code data for a user
+  const generateQrCodeData = (user) => {
+    return JSON.stringify({
+      id: user.id,
+      registrationNumber: user.registrationNumber,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: user.role,
+      dateOfBirth: user.dateOfBirth
+    });
+  };
+  const handleDownloadQrCode = () => {
+    if (!selectedUser) return;
+    
+    // Get the SVG element
+    const svgElement = document.getElementById('user-qr-code');
+    if (!svgElement) return;
+    
+    // Create a canvas element
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set dimensions
+    const svgRect = svgElement.getBoundingClientRect();
+    canvas.width = svgRect.width;
+    canvas.height = svgRect.height;
+    
+    // Create an image from the SVG
+    const img = new Image();
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    img.onload = () => {
+      // Draw the image on the canvas
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      
+      // Convert to PNG and download
+      const fileName = `qrcode-${selectedUser.registrationNumber}.png`;
+      
+      // For modern browsers
+      if (canvas.toBlob) {
+        canvas.toBlob((blob) => {
+          const link = document.createElement('a');
+          link.download = fileName;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }, 'image/png');
+      } else {
+        // Fallback for older browsers
+        const dataURL = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataURL;
+        link.click();
+      }
+      
+      URL.revokeObjectURL(url);
+    };
+    
+    img.src = url;
   };
 
   return (
@@ -343,6 +426,20 @@ const AdminDashboard = () => {
                         />
                       </TableCell>
                       <TableCell>
+                        <Tooltip title={t.tooltips?.qrCode || "View QR Code"}>
+                          <IconButton
+                            onClick={() => handleQrCodeClick(user)}
+                            size="small"
+                            sx={{
+                              mr: 1,
+                              '&:hover': {
+                                backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                              },
+                            }}
+                          >
+                            <QrCodeIcon />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title={t.tooltips.editUser}>
                           <IconButton
                             color="primary"
@@ -401,21 +498,21 @@ const AdminDashboard = () => {
         </Paper>
       </Box>
 
-      {/* Edit User Dialog */}
+      {/* QR Code Dialog */}
       <Dialog
-        open={openEditDialog}
-        onClose={handleCloseEditDialog}
+        open={openQrDialog}
+        onClose={handleCloseQrDialog}
         maxWidth="sm"
-        fullWidth
         PaperProps={{
           elevation: 8,
           sx: { borderRadius: 2 }
         }}
       >
-        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2 }}>
-          {t.editDialog.title}
+        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2, display: 'flex', alignItems: 'center' }}>
+          <QrCodeIcon sx={{ mr: 1 }} />
+          {t.qrDialog?.title || "User QR Code"}
         </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
+        <DialogContent sx={{ pt: 4, pb: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {selectedUser && (
             <>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -439,145 +536,261 @@ const AdminDashboard = () => {
                 </Box>
               </Box>
               
-              <form onSubmit={editFormik.handleSubmit}>
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      id="firstName"
-                      name="firstName"
-                      label={t.editDialog.fields.firstName}
-                      value={editFormik.values.firstName}
-                      onChange={editFormik.handleChange}
-                      onBlur={editFormik.handleBlur}
-                      error={editFormik.touched.firstName && Boolean(editFormik.errors.firstName)}
-                      helperText={editFormik.touched.firstName && editFormik.errors.firstName}
-                      variant="outlined"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      id="lastName"
-                      name="lastName"
-                      label={t.editDialog.fields.lastName}
-                      value={editFormik.values.lastName}
-                      onChange={editFormik.handleChange}
-                      onBlur={editFormik.handleBlur}
-                      error={editFormik.touched.lastName && Boolean(editFormik.errors.lastName)}
-                      helperText={editFormik.touched.lastName && editFormik.errors.lastName}
-                      variant="outlined"
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      id="email"
-                      name="email"
-                      label={t.editDialog.fields.email}
-                      value={editFormik.values.email}
-                      onChange={editFormik.handleChange}
-                      onBlur={editFormik.handleBlur}
-                      error={editFormik.touched.email && Boolean(editFormik.errors.email)}
-                      helperText={editFormik.touched.email && editFormik.errors.email}
-                      variant="outlined"
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      id="dateOfBirth"
-                      name="dateOfBirth"
-                      label={t.editDialog.fields.dateOfBirth}
-                      type="date"
-                      InputLabelProps={{ shrink: true }}
-                      value={editFormik.values.dateOfBirth}
-                      onChange={editFormik.handleChange}
-                      onBlur={editFormik.handleBlur}
-                      error={editFormik.touched.dateOfBirth && Boolean(editFormik.errors.dateOfBirth)}
-                      helperText={editFormik.touched.dateOfBirth && editFormik.errors.dateOfBirth}
-                      variant="outlined"
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      id="role"
-                      name="role"
-                      select
-                      label={t.editDialog.fields.role}
-                      value={editFormik.values.role}
-                      onChange={editFormik.handleChange}
-                      onBlur={editFormik.handleBlur}
-                      error={editFormik.touched.role && Boolean(editFormik.errors.role)}
-                      helperText={editFormik.touched.role && editFormik.errors.role}
-                      variant="outlined"
-                    >
-                      {/* Fix: Replace native select with Material UI MenuItem components */}
-                      <MenuItem value="student">{t.roles.student}</MenuItem>
-                      <MenuItem value="admin">{t.roles.admin}</MenuItem>
-                    </TextField>
-                  </Grid>
-                </Grid>
-              </form>
+              <Box 
+                sx={{ 
+                  p: 3, 
+                  bgcolor: 'white', 
+                  borderRadius: 2, 
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)', 
+                  mb: 2 
+                }}
+              >
+                <QRCode 
+                  id="user-qr-code"
+                  value={generateQrCodeData(selectedUser)} 
+                  size={200}
+                  level="H"
+                />
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" align="center">
+                {t.qrDialog?.scanInstruction || "Scan this QR code to view user information"}
+              </Typography>
+              
+              
             </>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button
-            onClick={handleCloseEditDialog}
-            variant="outlined"
-            color="inherit"
-          >
-            {t.editDialog.buttons.cancel}
-          </Button>
-          <Button
-            onClick={() => editFormik.handleSubmit()}
+        <DialogActions sx={{ px: 3, pb: 3, display: 'flex', justifyContent: 'space-between' }}>
+    <Button 
+      onClick={handleDownloadQrCode}
+      variant="outlined" 
+      color="primary"
+      startIcon={<DownloadIcon />}
+      sx={{ borderRadius: 2, px: 3 }}
+    >
+      {t.qrDialog?.downloadButton || "Download QR Code"}
+    </Button>
+    <Button 
+      onClick={handleCloseQrDialog} 
+      variant="contained" 
+      color="primary"
+      sx={{ borderRadius: 2, px: 3 }}
+    >
+      {t.qrDialog?.closeButton || "Close"}
+    </Button>
+  </DialogActions>
+</Dialog>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            onClick={handleCloseQrDialog} 
+            variant="contained" 
             color="primary"
-            variant="contained"
-            disabled={editFormik.isSubmitting || !selectedUser}
-            startIcon={editFormik.isSubmitting ? <CircularProgress size={20} /> : null}
+            sx={{ borderRadius: 2, px: 3 }}
           >
-            {editFormik.isSubmitting ? t.editDialog.buttons.updating : t.editDialog.buttons.update}
+            {t.qrDialog?.closeButton || "Close"}
           </Button>
         </DialogActions>
-      </Dialog>
+      
 
-      {/* Delete User Dialog */}
+      {/* Edit User Dialog */}
       <Dialog
-        open={openDeleteDialog}
-        onClose={handleCloseDeleteDialog}
+        open={openEditDialog}
+        onClose={handleCloseEditDialog}
+        maxWidth="md"
         PaperProps={{
           elevation: 8,
           sx: { borderRadius: 2 }
         }}
       >
-        <DialogTitle sx={{ bgcolor: 'error.main', color: 'white' }}>
-          {t.deleteDialog.title}
+        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2, display: 'flex', alignItems: 'center' }}>
+          <EditIcon sx={{ mr: 1 }} />
+          {t.editDialog?.title || "Edit User"}
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
+        <form onSubmit={editFormik.handleSubmit}>
+          <DialogContent sx={{ p: 3 }}>
+            <Grid container spacing={3} sx={{ mt: 0 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  id="firstName"
+                  name="firstName"
+                  label={t.editDialog?.firstName || "First Name"}
+                  value={editFormik.values.firstName}
+                  onChange={editFormik.handleChange}
+                  onBlur={editFormik.handleBlur}
+                  error={editFormik.touched.firstName && Boolean(editFormik.errors.firstName)}
+                  helperText={editFormik.touched.firstName && editFormik.errors.firstName}
+                  variant="outlined"
+                  sx={{ mb: { xs: 0, sm: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  id="lastName"
+                  name="lastName"
+                  label={t.editDialog?.lastName || "Last Name"}
+                  value={editFormik.values.lastName}
+                  onChange={editFormik.handleChange}
+                  onBlur={editFormik.handleBlur}
+                  error={editFormik.touched.lastName && Boolean(editFormik.errors.lastName)}
+                  helperText={editFormik.touched.lastName && editFormik.errors.lastName}
+                  variant="outlined"
+                  sx={{ mb: { xs: 0, sm: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  id="email"
+                  name="email"
+                  label={t.editDialog?.email || "Email"}
+                  value={editFormik.values.email}
+                  onChange={editFormik.handleChange}
+                  onBlur={editFormik.handleBlur}
+                  error={editFormik.touched.email && Boolean(editFormik.errors.email)}
+                  helperText={editFormik.touched.email && editFormik.errors.email}
+                  variant="outlined"
+                  sx={{ mb: { xs: 0, sm: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  label={t.editDialog?.dateOfBirth || "Date of Birth"}
+                  type="date"
+                  value={editFormik.values.dateOfBirth}
+                  onChange={editFormik.handleChange}
+                  onBlur={editFormik.handleBlur}
+                  error={editFormik.touched.dateOfBirth && Boolean(editFormik.errors.dateOfBirth)}
+                  helperText={editFormik.touched.dateOfBirth && editFormik.errors.dateOfBirth}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  variant="outlined"
+                  sx={{ mb: { xs: 0, sm: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  id="role"
+                  name="role"
+                  select
+                  label={t.editDialog?.role || "Role"}
+                  value={editFormik.values.role}
+                  onChange={editFormik.handleChange}
+                  onBlur={editFormik.handleBlur}
+                  error={editFormik.touched.role && Boolean(editFormik.errors.role)}
+                  helperText={editFormik.touched.role && editFormik.errors.role}
+                  variant="outlined"
+                >
+                  <MenuItem value="student">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+                      {t.roles?.student || "Student"}
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="admin">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SupervisorAccountIcon sx={{ mr: 1, fontSize: 20 }} />
+                      {t.roles?.admin || "Administrator"}
+                    </Box>
+                  </MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 3 }}>
+            <Button 
+              onClick={handleCloseEditDialog} 
+              variant="outlined"
+              sx={{ borderRadius: 2, px: 3 }}
+            >
+              {t.editDialog?.cancelButton || "Cancel"}
+            </Button>
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary"
+              disabled={editFormik.isSubmitting}
+              sx={{ borderRadius: 2, px: 3, ml: 2 }}
+            >
+              {editFormik.isSubmitting ? (
+                <CircularProgress size={24} />
+              ) : (
+                t.editDialog?.saveButton || "Save Changes"
+              )}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleCloseDeleteDialog}
+        maxWidth="sm"
+        PaperProps={{
+          elevation: 8,
+          sx: { borderRadius: 2 }
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: 'error.main', color: 'white', py: 2, display: 'flex', alignItems: 'center' }}>
+          <DeleteIcon sx={{ mr: 1 }} />
+          {t.deleteDialog?.title || "Delete User"}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 4, pb: 2 }}>
+          <DialogContentText>
+            {selectedUser && t.deleteDialog?.confirmMessage?.replace('{name}', `${selectedUser.firstName} ${selectedUser.lastName}`) || 
+              "Are you sure you want to delete this user? This action cannot be undone."}
+          </DialogContentText>
           {selectedUser && (
-            <DialogContentText>
-              {t.deleteDialog.confirmMessage.replace('{name}', `${selectedUser.firstName} ${selectedUser.lastName}`)}
-            </DialogContentText>
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Avatar
+                sx={{
+                  mr: 2,
+                  bgcolor: selectedUser.role === 'admin' ? 'secondary.main' : 'primary.main',
+                  width: 40,
+                  height: 40
+                }}
+              >
+                {getInitials(selectedUser.firstName, selectedUser.lastName)}
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  {`${selectedUser.firstName} ${selectedUser.lastName}`}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedUser.email} • {selectedUser.registrationNumber}
+                </Typography>
+              </Box>
+            </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button
-            onClick={handleCloseDeleteDialog}
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            onClick={handleCloseDeleteDialog} 
             variant="outlined"
-            color="inherit"
+            sx={{ borderRadius: 2, px: 3 }}
           >
-            {t.deleteDialog.buttons.cancel}
+            {t.deleteDialog?.cancelButton || "Cancel"}
           </Button>
-          <Button
-            onClick={handleDeleteUser}
+          <Button 
+            onClick={handleDeleteUser} 
+            variant="contained" 
             color="error"
-            variant="contained"
-            disabled={deleteLoading || !selectedUser}
-            startIcon={deleteLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
+            disabled={deleteLoading}
+            sx={{ borderRadius: 2, px: 3, ml: 2 }}
           >
-            {deleteLoading ? t.deleteDialog.buttons.deleting : t.deleteDialog.buttons.delete}
+            {deleteLoading ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              t.deleteDialog?.deleteButton || "Delete"
+            )}
           </Button>
         </DialogActions>
       </Dialog>
